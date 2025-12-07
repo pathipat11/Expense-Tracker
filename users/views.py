@@ -10,6 +10,10 @@ from rest_framework_simplejwt.exceptions import TokenError
 
 from .serializers import RegisterSerializer, MeSerializer
 
+from drf_spectacular.utils import extend_schema
+from rest_framework import serializers
+
+
 User = get_user_model()
 
 def set_refresh_cookie(response: Response, refresh_token: str):
@@ -32,14 +36,33 @@ def clear_refresh_cookie(response: Response):
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        request=RegisterSerializer,
+        responses={201: None},
+        tags=["auth"]
+    )
     def post(self, request):
         ser = RegisterSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         user = ser.save()
-        return Response({"id": user.id, "username": user.username, "email": user.email}, status=status.HTTP_201_CREATED)
+        return Response(
+            {"id": user.id, "username": user.username, "email": user.email},
+            status=status.HTTP_201_CREATED
+        )
+        
+class LoginInputSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=False)
+    username = serializers.CharField(required=False)
+    password = serializers.CharField()
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    
+    @extend_schema(
+        request=LoginInputSerializer,
+        responses={200: None},
+        tags=["auth"]
+    )
 
     def post(self, request):
         username = request.data.get("username")
@@ -72,6 +95,7 @@ class LoginView(APIView):
 class RefreshView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(tags=["auth"])
     def post(self, request):
         refresh_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         if not refresh_token:
@@ -103,6 +127,7 @@ class RefreshView(APIView):
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(tags=["auth"])
     def post(self, request):
         refresh_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         res = Response({"detail": "Logged out"}, status=status.HTTP_200_OK)

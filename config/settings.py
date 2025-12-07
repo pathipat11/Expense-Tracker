@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 
     "rest_framework_simplejwt.token_blacklist",
 
+    "finance",
     "users.apps.UsersConfig",
 ]
 
@@ -169,3 +170,9 @@ SIMPLE_JWT = {
 
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
