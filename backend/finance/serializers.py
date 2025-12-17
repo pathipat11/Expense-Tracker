@@ -77,27 +77,41 @@ class TransactionSerializer(serializers.ModelSerializer):
     wallet = WalletSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
     currency = CurrencySerializer(read_only=True)
+    receipt_abs_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Transaction
         fields = [
-            "id",
-            "type",
-            "occurred_at",
-            "amount",
-            "wallet", "wallet_id",
-            "currency",
-            "fx_rate",
-            "base_amount",
+            "id", "type", "occurred_at", "amount",
+            "wallet", "wallet_id", "currency",
+            "fx_rate", "base_amount",
             "category", "category_id",
-            "merchant",
-            "note",
-            "receipt_url",
-            "is_deleted",
-            "created_at",
+            "merchant", "note",
+            "receipt_url", "receipt_abs_url",
+            "is_deleted", "created_at",
         ]
-        read_only_fields = ["currency", "fx_rate", "base_amount", "is_deleted", "created_at"]
+        read_only_fields = ["currency", "fx_rate", "base_amount", "is_deleted", "created_at", "receipt_abs_url"]
+    
+    def get_receipt_abs_url(self, obj: Transaction):
+        raw = getattr(obj, "receipt_url", None)
+        if not raw:
+            return None
 
+        if raw.startswith("http://") or raw.startswith("https://"):
+            return raw
+
+        request = self.context.get("request")
+        if not request:
+            return raw
+
+        if raw.startswith("/"):
+            return request.build_absolute_uri(raw)
+
+        idx = raw.find("media/")
+        if idx != -1:
+            return request.build_absolute_uri("/" + raw[idx:])
+        return request.build_absolute_uri("/" + raw)
+        
     def validate_wallet(self, wallet: Wallet):
         request = self.context["request"]
         if wallet.owner_id != request.user.id:
