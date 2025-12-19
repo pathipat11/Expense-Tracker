@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ProtectedLayout from "@/components/ProtectedLayout";
-import { getMonthlyInsightAuto, InsightLanguage } from "@/lib/insights";
+import { getInsights, InsightsResponse } from "@/lib/insights";
+import { getReportsSummary, ReportsSummary } from "@/lib/reports";
 
 function yyyyMmNow() {
     const d = new Date();
@@ -15,43 +15,34 @@ function yyyyMmNow() {
 
 export default function InsightsPage() {
     const [month, setMonth] = useState(yyyyMmNow());
-    const [language, setLanguage] = useState<InsightLanguage>("th");
+    const [loading, setLoading] = useState(true);
+    const [err, setErr] = useState("");
+    const [data, setData] = useState<InsightsResponse | null>(null);
+    const [summary, setSummary] = useState<ReportsSummary | null>(null);
 
-    const [loading, setLoading] = useState(false);
-    const [source, setSource] = useState<"ai" | "fallback" | null>(null);
-    const [text, setText] = useState<string>("");
-    const [error, setError] = useState<string>("");
-
-    const badge = useMemo(() => {
-        if (!source) return null;
-        return source === "ai"
-            ? { label: "AI", cls: "bg-emerald-600 text-white" }
-            : { label: "Fallback (Free)", cls: "bg-gray-900 text-white" };
-    }, [source]);
-
-    async function generate() {
+    async function load() {
         setLoading(true);
-        setError("");
+        setErr("");
         try {
-            const res = await getMonthlyInsightAuto(month, language);
-            setText(res.text || "");
-            setSource(res.source);
+            const [i, s] = await Promise.all([
+                getInsights(month),
+                getReportsSummary(month).catch(() => null),
+            ]);
+            setData(i);
+            setSummary(s);
         } catch (e: any) {
-            setError("Failed to generate insight.");
-            setSource(null);
-            setText("");
+            setErr(e?.response?.data?.detail || e?.message || "Failed to load insights");
         } finally {
             setLoading(false);
         }
     }
 
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(text || "");
-        } catch {
-            // ignore
-        }
-    }
+    useEffect(() => {
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [month]);
+
+    const currency = data?.base_currency || summary?.base_currency || "THB";
 
     return (
         <ProtectedLayout>
@@ -59,13 +50,19 @@ export default function InsightsPage() {
                 {/* Header */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-semibold">Insights (AI)</h1>
+                        <h1 className="text-2xl font-semibold">
+                            Insights <span className="text-emerald-600">(AI)</span>
+                        </h1>
                         <p className="text-sm text-gray-600">
-                            Generate monthly insight. Auto fallback if AI key is missing.
+                            Smart summary for your spending • mode:{" "}
+                            <span className="font-medium">
+                                {data?.mode ? data.mode : "—"}
+                            </span>
+                            {" "}• currency: {currency}
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-3">
                         <label className="text-sm text-gray-600">Month</label>
                         <input
                             type="month"
@@ -73,73 +70,90 @@ export default function InsightsPage() {
                             onChange={(e) => setMonth(e.target.value)}
                             className="rounded-xl border px-3 py-2"
                         />
-
-                        <label className="text-sm text-gray-600">Language</label>
-                        <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value as InsightLanguage)}
-                            className="rounded-xl border px-3 py-2"
-                        >
-                            <option value="th">ไทย</option>
-                            <option value="en">English</option>
-                        </select>
-
                         <button
-                            onClick={generate}
-                            disabled={loading}
-                            className="rounded-xl border px-4 py-2 hover:bg-gray-50 disabled:opacity-60"
+                            onClick={load}
+                            className="rounded-xl border px-4 py-2 hover:bg-gray-50"
                         >
-                            {loading ? "Generating..." : "Generate"}
+                            Refresh
                         </button>
                     </div>
                 </div>
 
-                {/* Result */}
-                <div className="rounded-2xl border p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="font-medium">Monthly Insight</div>
-                            {badge && (
-                                <span className={`text-xs px-2 py-1 rounded-full ${badge.cls}`}>
-                                    {badge.label}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={copy}
-                                disabled={!text}
-                                className="rounded-xl border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-60"
-                            >
-                                Copy
-                            </button>
-                        </div>
+                {err && (
+                    <div className="rounded-2xl border bg-rose-50 p-4 text-sm text-rose-700">
+                        {err}
                     </div>
+                )}
 
-                    {error && (
-                        <div className="mt-3 rounded-xl border bg-rose-50 p-3 text-sm text-rose-700">
-                            {error}
-                        </div>
-                    )}
+                {/* Summary mini cards */}
+                <section className="grid gap-4 md:grid-cols-3">
+                    <Card title="Income" value={summary ? `${summary.income} ${currency}` : "—"} loading={loading} />
+                    <Card title="Expense" value={summary ? `${summary.expense} ${currency}` : "—"} loading={loading} />
+                    <Card title="Net" value={summary ? `${summary.net} ${currency}` : "—"} loading={loading} />
+                </section>
 
-                    <div className="mt-4">
-                        {!text ? (
-                            <div className="text-sm text-gray-600">
-                                Click <b>Generate</b> to create your monthly insight.
+                {/* Insights list */}
+                <section className="rounded-2xl border p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="font-medium">Key insights</div>
+                        {data?.mode === "fallback" && (
+                            <div className="text-xs text-gray-500">
+                                AI key not found → using fallback insights
                             </div>
-                        ) : (
-                            <pre className="whitespace-pre-wrap text-sm leading-6">
-                                {text}
-                            </pre>
+                        )}
+                        {data?.mode === "ai" && (
+                            <div className="text-xs text-emerald-700">
+                                AI enabled ✅
+                            </div>
                         )}
                     </div>
 
-                    <div className="mt-3 text-xs text-gray-500">
-                        * If OpenAI key is missing/invalid, the app automatically falls back to a free rule-based summary from Reports.
-                    </div>
-                </div>
+                    {loading ? (
+                        <div className="p-6 text-sm text-gray-600">Loading...</div>
+                    ) : !data || data.items.length === 0 ? (
+                        <div className="p-6 text-sm text-gray-600">No insights.</div>
+                    ) : (
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            {data.items.map((it, idx) => (
+                                <div key={idx} className="rounded-xl border p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="font-medium">{it.title}</div>
+                                        <Badge level={it.level} />
+                                    </div>
+                                    <div className="mt-1 text-sm text-gray-700">{it.detail}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
             </div>
         </ProtectedLayout>
+    );
+}
+
+function Card({ title, value, loading }: { title: string; value: string; loading: boolean }) {
+    return (
+        <div className="rounded-2xl border p-4">
+            <div className="text-sm text-gray-600">{title}</div>
+            <div className="mt-2 text-xl font-semibold">{loading ? "…" : value}</div>
+        </div>
+    );
+}
+
+function Badge({ level }: { level?: "info" | "good" | "warn" }) {
+    const text =
+        level === "good" ? "Good" : level === "warn" ? "Warn" : "Info";
+
+    const cls =
+        level === "good"
+            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+            : level === "warn"
+                ? "bg-amber-50 text-amber-800 border-amber-200"
+                : "bg-gray-50 text-gray-700 border-gray-200";
+
+    return (
+        <span className={`rounded-full border px-2 py-1 text-xs ${cls}`}>
+            {text}
+        </span>
     );
 }
