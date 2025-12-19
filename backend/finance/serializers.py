@@ -18,14 +18,40 @@ class WalletSerializer(serializers.ModelSerializer):
         write_only=True
     )
 
+    tx_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Wallet
         fields = [
             "id", "name", "type",
             "currency", "currency_id",
             "opening_balance", "is_active",
+            "tx_count",
             "created_at", "updated_at",
         ]
+
+    def validate(self, attrs):
+        """
+        กันการแก้ currency/opening_balance เมื่อ wallet มี transaction แล้ว
+        """
+        inst: Wallet | None = getattr(self, "instance", None)
+        if not inst:
+            return attrs
+
+        tx_count = getattr(inst, "tx_count", None)
+        if tx_count is None:
+            # fallback ถ้า queryset ไม่ annotate
+            tx_count = inst.transactions.filter(is_deleted=False).count()
+
+        if tx_count > 0:
+            # ถ้ามี tx แล้ว: ห้ามแก้ currency และ opening_balance
+            if "currency" in attrs:
+                raise serializers.ValidationError({"currency_id": "Cannot change currency after wallet has transactions."})
+            if "opening_balance" in attrs:
+                raise serializers.ValidationError({"opening_balance": "Cannot change opening balance after wallet has transactions."})
+
+        return attrs
+
 
 class FxRateSerializer(serializers.ModelSerializer):
     base = CurrencySerializer(read_only=True)

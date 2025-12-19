@@ -102,7 +102,8 @@ class Transaction(models.Model):
     category = models.ForeignKey(Category, null=True, blank=True, on_delete=models.SET_NULL, related_name="transactions")
     merchant = models.CharField(max_length=120, blank=True, default="")
     note = models.TextField(blank=True, default="")
-    receipt_url = models.URLField(blank=True, default="")
+    receipt_url = models.CharField(max_length=500, blank=True, default="")
+
     receipt_file = models.ImageField(upload_to="receipts/%Y/%m/", null=True, blank=True)
 
     is_deleted = models.BooleanField(default=False)
