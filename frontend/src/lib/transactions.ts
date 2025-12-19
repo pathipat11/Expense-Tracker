@@ -7,7 +7,7 @@ export type Transaction = {
     amount: string;
     merchant: string;
     note: string;
-    receipt_url: string;
+    receipt_url: string | null;
     base_amount: string;
     fx_rate: string;
     currency?: { id: number; code: string; name?: string };
@@ -28,12 +28,16 @@ export async function createTransaction(payload: {
     category_id?: number | null;
     merchant?: string;
     note?: string;
+    receipt_url?: string | null; // ✅ เพิ่มไว้รองรับ auto-fill
 }) {
     const res = await api.post("/api/transactions/", payload);
     return res.data as Transaction;
 }
 
-export async function patchTransaction(id: number, payload: Partial<{ receipt_url: string; merchant: string; note: string }>) {
+export async function patchTransaction(
+    id: number,
+    payload: Partial<{ receipt_url: string | null; merchant: string; note: string }>
+) {
     const res = await api.patch(`/api/transactions/${id}/`, payload);
     return res.data as Transaction;
 }
@@ -46,5 +50,9 @@ export async function uploadReceipt(file: File) {
         headers: { "Content-Type": "multipart/form-data" },
     });
 
-    return res.data as { id: number; receipt_url: string };
+    const data = res.data;
+    return {
+        id: data.id,
+        receipt_url: data.file_url ?? data.receipt_url ?? data.image_url ?? data.url ?? data.file,
+    } as { id: number; receipt_url: string };
 }

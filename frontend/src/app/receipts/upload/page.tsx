@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import ProtectedLayout from "@/components/ProtectedLayout";
 import { uploadReceipt, ReceiptUploadResponse } from "@/lib/receipts";
 
@@ -14,6 +15,7 @@ export default function ReceiptUploadPage() {
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
     const [result, setResult] = useState<ReceiptUploadResponse | null>(null);
+    const router = useRouter();
 
     const previewUrl = useMemo(() => {
         if (!file) return "";
@@ -26,11 +28,7 @@ export default function ReceiptUploadPage() {
         };
     }, [previewUrl]);
 
-    const uploadedUrl =
-        (result as any)?.file_url ||
-        (result as any)?.receipt_url ||
-        (result as any)?.image_url ||
-        "";
+    const uploadedUrl = result?.file_url || "";
 
     async function onUpload() {
         if (!file) return;
@@ -65,7 +63,7 @@ export default function ReceiptUploadPage() {
                 <div className="flex flex-col gap-1">
                     <h1 className="text-2xl font-semibold">Receipt Upload</h1>
                     <p className="text-sm text-gray-600">
-                        Upload a receipt image. You can link it to a transaction later.
+                        Upload a receipt image. You can attach it to a transaction next.
                     </p>
                 </div>
 
@@ -135,15 +133,31 @@ export default function ReceiptUploadPage() {
                         {result && (
                             <div className="mt-4 rounded-xl border bg-emerald-50 p-3 text-sm text-emerald-800">
                                 Uploaded ✅ (id: {result.id})
-                                {uploadedUrl ? (
-                                    <div className="mt-1 text-xs text-emerald-800 break-all">
-                                        {uploadedUrl}
-                                    </div>
-                                ) : (
-                                    <div className="mt-1 text-xs text-emerald-800">
-                                        (No URL returned — check backend response fields)
-                                    </div>
-                                )}
+                                <div className="mt-1 text-xs break-all">{result.file_url}</div>
+
+                                <div className="mt-3 flex items-center gap-2">
+                                    <button
+                                        onClick={() =>
+                                            router.push(
+                                                `/transactions/new?receipt_id=${result.id}&receipt_url=${encodeURIComponent(
+                                                    result.file_url
+                                                )}`
+                                            )
+                                        }
+                                        className="rounded-xl border px-3 py-2 text-sm hover:bg-white"
+                                    >
+                                        Attach to new transaction
+                                    </button>
+
+                                    <a
+                                        href={result.file_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="rounded-xl border px-3 py-2 text-sm hover:bg-white"
+                                    >
+                                        Open
+                                    </a>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -181,7 +195,6 @@ export default function ReceiptUploadPage() {
                             )}
                         </div>
 
-                        {/* preview of uploaded URL */}
                         {uploadedUrl && (
                             <div className="mt-4">
                                 <div className="text-sm font-medium">Uploaded preview</div>
@@ -196,14 +209,6 @@ export default function ReceiptUploadPage() {
                             </div>
                         )}
                     </div>
-                </div>
-
-                <div className="rounded-2xl border p-4">
-                    <div className="font-medium">Next step</div>
-                    <p className="mt-1 text-sm text-gray-600">
-                        หลังอัปโหลดแล้ว เราจะทำหน้า Transactions ให้เลือก “Attach receipt”
-                        เพื่อผูก receipt_id กับ transaction ได้
-                    </p>
                 </div>
             </div>
         </ProtectedLayout>

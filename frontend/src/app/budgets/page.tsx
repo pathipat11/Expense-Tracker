@@ -84,7 +84,7 @@ export default function BudgetsPage() {
 
     return (
         <ProtectedLayout>
-            <div className="p-6 space-y-6">
+            <div className="space-y-6">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold">Budgets</h1>
