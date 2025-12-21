@@ -18,7 +18,12 @@ class BudgetViewSet(viewsets.ModelViewSet):
     serializer_class = BudgetSerializer
 
     def get_queryset(self):
-        return Budget.objects.filter(owner=self.request.user).order_by("-created_at")
+        qs = Budget.objects.filter(owner=self.request.user).order_by("-created_at")
+        month = self.request.query_params.get("month")
+        if month:
+            qs = qs.filter(month=month)
+        return qs
+
 
     @extend_schema(
         tags=["budgets"],

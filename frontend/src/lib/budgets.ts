@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { api } from "@/lib/api";
 
 export type Budget = {
@@ -5,8 +7,12 @@ export type Budget = {
     month: string; // YYYY-MM
     scope: "total" | "category";
     limit_base_amount: string;
-    category?: { id: number; name: string };
+    category?: { id: number; name: string; type?: string; parent?: number | null } | null;
     created_at: string;
+
+    // optional fields from backend
+    alert_80_sent?: boolean;
+    alert_100_sent?: boolean;
 };
 
 export type BudgetStatusItem = {
@@ -28,9 +34,22 @@ export type BudgetStatusResponse = {
     items: BudgetStatusItem[];
 };
 
+type Paginated<T> = {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: T[];
+};
+
+function unwrapList<T>(data: any): T[] {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.results)) return data.results;
+    return []; // กัน runtime พัง
+}
+
 export async function listBudgets(month: string) {
     const res = await api.get("/api/budgets/", { params: { month } });
-    return res.data as Budget[];
+    return unwrapList<Budget>(res.data);
 }
 
 export async function createBudget(payload: {

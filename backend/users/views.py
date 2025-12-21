@@ -95,29 +95,29 @@ class LoginView(APIView):
 class RefreshView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["auth"])
     def post(self, request):
         refresh_token = request.COOKIES.get(settings.REFRESH_COOKIE_NAME)
         if not refresh_token:
-            return Response({"detail": "Missing refresh cookie"}, status=status.HTTP_401_UNAUTHORIZED)
+            res = Response({"detail": "Missing refresh cookie"}, status=status.HTTP_401_UNAUTHORIZED)
+            clear_refresh_cookie(res)
+            return res
 
         try:
             old_refresh = RefreshToken(refresh_token)
-
-            # ✅ ดึง user_id จาก payload แล้ว query user เอง
             user_id = old_refresh.get("user_id")
             if not user_id:
-                return Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+                res = Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+                clear_refresh_cookie(res)
+                return res
 
             user = User.objects.filter(id=user_id, is_active=True).first()
             if not user:
-                return Response({"detail": "User not found"}, status=status.HTTP_401_UNAUTHORIZED)
+                res = Response({"detail": "User not found"}, status=status.HTTP_401_UNAUTHORIZED)
+                clear_refresh_cookie(res)
+                return res
 
-            # ✅ rotate refresh (ถ้าเปิด)
             if settings.SIMPLE_JWT.get("ROTATE_REFRESH_TOKENS", False):
                 new_refresh = RefreshToken.for_user(user)
-
-                # blacklist token เก่าถ้าเปิดไว้
                 if settings.SIMPLE_JWT.get("BLACKLIST_AFTER_ROTATION", False):
                     try:
                         old_refresh.blacklist()
@@ -127,13 +127,14 @@ class RefreshView(APIView):
                 new_refresh = old_refresh
 
             access = str(new_refresh.access_token)
-
             res = Response({"access": access}, status=status.HTTP_200_OK)
             set_refresh_cookie(res, str(new_refresh))
             return res
 
         except TokenError:
-            return Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+            res = Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+            clear_refresh_cookie(res)   # ✅ สำคัญ
+            return res
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
